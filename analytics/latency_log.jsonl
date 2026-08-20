@@ -1,0 +1,2 @@
+{"timestamp": "2026-08-20T10:51:13.262532", "query_id": "test1_diabetes", "total_ms": 1692.1596669999417, "stt_ms": 1691.5595840000606, "retrieval_ms": 0.4845000003115274, "generation_ms": 0.1038330001392751, "guardrail_ms": 0.007333999747061171, "answer_allowed": true}
+{"timestamp": "2026-08-20T11:08:33.668564", "query_id": null, "total_ms": 1220.913749999454, "stt_ms": 1220.5091249998077, "retrieval_ms": 0.35195800046494696, "generation_ms": 0.04491700019570999, "guardrail_ms": 0.004749999789055437, "answer_allowed": true}

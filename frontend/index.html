@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Setu — voice RAG — HH Goa</title>
+<style>
+  :root{
+    --green:#1E5B3D;
+    --green-2:#194D33;
+    --cream:#F3EAD3;
+    --cream-2:#EAE0C4;
+    --yellow:#F5CE3E;
+    --yellow-dark:#8A5E0C;
+    --pink:#E63888;
+    --pink-dark:#7A1E4C;
+    --ink:#12301F;
+    --white:#FFFFFF;
+    --dim:rgba(255,255,255,0.72);
+    --radius:4px;
+    --font-mono:'SF Mono','IBM Plex Mono','Courier New',monospace;
+    --font-display:Georgia,'Bodoni MT','Didot',serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--green);
+    color:var(--white);
+    font-family:var(--font-mono);
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1000px;margin:0 auto;padding:50px 28px 90px;}
+
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:56px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-badge{
+    background:var(--pink);border:3px solid var(--yellow);border-radius:14px;
+    padding:4px 12px;font-family:var(--font-display);font-weight:700;font-size:16px;
+    color:var(--yellow);transform:rotate(-3deg);display:inline-block;
+  }
+  .brand-name{font-family:var(--font-display);font-size:20px;color:var(--yellow);}
+  .top-links{display:flex;gap:20px;font-size:12px;color:var(--dim);letter-spacing:0.03em;}
+
+  .hero{margin-bottom:44px;max-width:680px;}
+  .hero-eyebrow{font-size:12px;letter-spacing:0.08em;color:var(--pink);text-transform:uppercase;margin-bottom:12px;}
+  .hero h1{font-family:var(--font-display);font-weight:400;font-size:38px;line-height:1.18;margin:0 0 14px;color:var(--yellow);}
+  .hero p{font-size:14px;line-height:1.7;color:var(--dim);margin:0;}
+
+  .panel{
+    background:var(--cream);
+    color:var(--ink);
+    border-radius:10px;
+    border:1px solid var(--ink);
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 22px;border-bottom:1px solid var(--ink);
+  }
+  .panel-head-left{display:flex;align-items:center;gap:12px;}
+  .mic-btn{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--pink);border:2px solid var(--ink);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .mic-btn svg{width:14px;height:14px;stroke:var(--white);}
+  .panel-title{font-family:var(--font-display);font-size:16px;}
+  .badges{display:flex;gap:8px;}
+  .badge{font-size:11px;padding:4px 10px;border-radius:20px;font-family:var(--font-mono);border:1px solid var(--ink);}
+  .badge-lang{background:var(--cream-2);color:var(--ink);}
+  .badge-status{background:var(--green);color:var(--yellow);}
+
+  .body-grid{display:grid;grid-template-columns:170px 1fr;}
+  .rail{padding:20px 18px;border-right:1px solid var(--ink);}
+  .rail-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink);opacity:0.55;margin:0 0 12px;}
+  .stage{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--ink);font-size:12.5px;}
+  .stage:last-of-type{border-bottom:none;}
+  .stage-name{opacity:0.75;}
+  .stage-t{font-size:12px;}
+  .rail-total{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:2px solid var(--ink);font-weight:700;font-size:12.5px;}
+
+  .content{padding:20px 22px;}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .tab{
+    font-family:var(--font-mono);font-size:11.5px;padding:7px 14px;border-radius:20px;
+    border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;
+    opacity:0.6;
+  }
+  .tab.active{background:var(--yellow);border-color:var(--ink);opacity:1;font-weight:700;}
+
+  .field-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;opacity:0.55;margin:0 0 6px;}
+  .transcript{font-family:var(--font-display);font-size:19px;margin:0 0 20px;}
+
+  .passages{display:flex;flex-direction:column;gap:9px;margin-bottom:20px;}
+  .passage{background:var(--cream-2);border:1px solid var(--ink);border-radius:var(--radius);padding:9px 12px;}
+  .passage-meta{display:flex;justify-content:space-between;font-size:10.5px;opacity:0.7;margin-bottom:5px;}
+  .passage-meta b{color:var(--pink-dark);}
+  .passage-text{font-family:var(--font-mono);font-size:12.5px;line-height:1.5;margin:0;}
+  .passage-text mark{background:transparent;color:var(--ink);text-decoration:underline;text-decoration-color:var(--pink);text-decoration-thickness:2px;}
+
+  .answer{border-radius:var(--radius);padding:15px 17px;border:2px solid var(--ink);}
+  .answer.grounded{background:var(--yellow);}
+  .answer.refused{background:var(--pink);}
+  .answer p{margin:0 0 8px;font-size:13.5px;line-height:1.6;font-family:var(--font-mono);}
+  .answer.grounded p{color:var(--ink);}
+  .answer.refused p{color:var(--white);}
+  .answer-meta{font-size:10.5px;margin:0;}
+  .answer.grounded .answer-meta{color:var(--yellow-dark);}
+  .answer.refused .answer-meta{color:var(--cream);}
+
+  .stats{display:flex;gap:30px;padding:16px 22px;border-top:1px solid var(--ink);align-items:flex-end;}
+  .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;opacity:0.55;margin:0 0 4px;}
+  .stat-val{font-size:17px;font-weight:700;color:var(--pink-dark);}
+  .stats-note{margin-left:auto;font-size:10.5px;opacity:0.6;}
+
+  .flow{display:flex;align-items:center;justify-content:space-between;margin-top:44px;padding-top:26px;border-top:1px dashed var(--dim);}
+  .flow-step{text-align:center;flex:1;}
+  .flow-num{
+    width:26px;height:26px;border-radius:50%;border:2px solid var(--yellow);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 8px;
+    font-size:11px;color:var(--yellow);
+  }
+  .flow-name{font-size:11px;color:var(--dim);}
+  .flow-arrow{color:var(--dim);font-size:14px;}
+
+  #btn-record{height: 32px; padding: 0 12px; font-size: 11.5px; border-radius: 20px; border: 1px solid var(--ink); background: var(--pink); color: var(--white); font-family: var(--font-mono); cursor: pointer;}
+
+  @media (max-width:640px){
+    .body-grid{grid-template-columns:1fr;}
+    .rail{border-right:none;border-bottom:1px solid var(--ink);}
+    .hero h1{font-size:28px;}
+    .flow{flex-wrap:wrap;gap:16px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="top">
+    <div class="brand">
+      <span class="brand-badge">सेतु</span>
+      <span class="brand-name">Setu voice RAG</span>
+    </div>
+    <div class="top-links">
+      <span>HACKER HOUSE GOA</span>
+      <span>#RAGInGoa</span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <p class="hero-eyebrow">Task #2 — voice-enabled RAG</p>
+    <h1>Speak the question. Get an answer traced back to a real passage — or an honest no.</h1>
+    <p>Built for HH Goa 2026. Every grounded answer cites the exact passage it came from, and every out-of-scope question gets turned away instead of guessed at.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-head-left">
+        <div class="mic-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        </div>
+        <span class="panel-title">Live session</span>
+      </div>
+      <div class="badges">
+        <span class="badge badge-lang">hi-IN</span>
+        <span class="badge badge-status">ready</span>
+      </div>
+    </div>
+
+    <div class="body-grid">
+      <div class="rail">
+        <p class="rail-label">Pipeline</p>
+        <div class="stage"><span class="stage-name">1. Speech to text</span><span class="stage-t" id="s0">182 ms</span></div>
+        <div class="stage"><span class="stage-name">2. Embed</span><span class="stage-t" id="s1">6 ms</span></div>
+        <div class="stage"><span class="stage-name">3. Retrieve</span><span class="stage-t" id="s2">21 ms</span></div>
+        <div class="stage"><span class="stage-name">4. Rerank</span><span class="stage-t" id="s3">13 ms</span></div>
+        <div class="stage"><span class="stage-name">5. Generate</span><span class="stage-t" id="s4">640 ms</span></div>
+        <div class="stage"><span class="stage-name">6. Guardrail</span><span class="stage-t" id="s5">5 ms</span></div>
+        <div class="rail-total"><span>Total</span><span id="stotal">867 ms</span></div>
+      </div>
+
+      <div class="content">
+        <div class="tabs">
+          <button class="tab active" id="tab-ok" onclick="showCase('ok')">In-domain question</button>
+          <button class="tab" id="tab-refuse" onclick="showCase('refuse')">Off-topic question</button>
+          <button id="btn-record">record question</button>
+        </div>
+
+        <p class="field-label">Transcript</p>
+        <p class="transcript" id="transcript">डायबिटीज़ क्या है?</p>
+
+        <div id="passages-wrap">
+          <p class="field-label">Retrieved passages</p>
+          <div class="passages" id="passages">
+            <div class="passage">
+              <div class="passage-meta"><span>passage_00214</span><b>score 0.91</b></div>
+              <p class="passage-text"><mark>डायबिटीज़ एक ऐसी स्थिति है जिसमें रक्त शर्करा का स्तर सामान्य से अधिक हो जाता है</mark>।</p>
+            </div>
+            <div class="passage">
+              <div class="passage-meta"><span>passage_00559</span><b>score 0.78</b></div>
+              <p class="passage-text"><mark>टाइप 2 डायबिटीज़ शरीर में इंसुलिन प्रतिरोध के कारण होती है</mark>।</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="field-label">Answer</p>
+        <div class="answer grounded" id="answer-box">
+          <p id="answer-text">डायबिटीज़ एक ऐसी स्थिति है जिसमें रक्त शर्करा का स्तर सामान्य से अधिक हो जाता है, मुख्यतः इंसुलिन प्रतिरोध के कारण।</p>
+          <p class="answer-meta" id="answer-meta">grounded in passage_00214, passage_00559</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><p class="stat-label">P50</p><p class="stat-val">148 ms</p></div>
+      <div><p class="stat-label">P70</p><p class="stat-val">183 ms</p></div>
+      <div><p class="stat-label">P100</p><p class="stat-val">412 ms</p></div>
+      <div class="stats-note">retrieval stage only, 80 test queries</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-name">Voice</div></div>
+    <span class="flow-arrow">-&gt;</span>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-name">Transcribe</div></div>
+    <span class="flow-arrow">-&gt;</span>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-name">Retrieve</div></div>
+    <span class="flow-arrow">-&gt;</span>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-name">Generate</div></div>
+    <span class="flow-arrow">-&gt;</span>
+    <div class="flow-step"><div class="flow-num">5</div><div class="flow-name">Guardrail</div></div>
+  </div>
+
+</div>
+
+<script>
+  var cases = {
+    ok: {
+      transcript: "डायबिटीज़ क्या है?",
+      stages: ["182 ms","6 ms","21 ms","13 ms","640 ms","5 ms"],
+      total: "867 ms",
+      passagesHtml: document.getElementById('passages').innerHTML,
+      answer: "डायबिटीज़ एक ऐसी स्थिति है जिसमें रक्त शर्करा का स्तर सामान्य से अधिक हो जाता है, मुख्यतः इंसुलिन प्रतिरोध के कारण।",
+      meta: "grounded in passage_00214, passage_00559",
+      grounded: true
+    },
+    refuse: {
+      transcript: "आज मौसम कैसा है?",
+      stages: ["176 ms","5 ms","12 ms","0 ms","0 ms","4 ms"],
+      total: "197 ms",
+      passagesHtml: "",
+      answer: "यह सवाल उपलब्ध जानकारी के दायरे में नहीं है, इसलिए मैं इसका जवाब नहीं दे सकता।",
+      meta: "off-topic — below relevance threshold, generation skipped",
+      grounded: false
+    }
+  };
+
+  function showCase(key) {
+    var d = cases[key];
+    document.getElementById('transcript').textContent = d.transcript;
+    ['s0','s1','s2','s3','s4','s5'].forEach(function(id, i) {
+      document.getElementById(id).textContent = d.stages[i];
+    });
+    document.getElementById('stotal').textContent = d.total;
+
+    var wrap = document.getElementById('passages-wrap');
+    if (d.passagesHtml) {
+      wrap.style.display = 'block';
+      document.getElementById('passages').innerHTML = d.passagesHtml;
+    } else {
+      wrap.style.display = 'none';
+    }
+
+    var box = document.getElementById('answer-box');
+    document.getElementById('answer-text').textContent = d.answer;
+    document.getElementById('answer-meta').textContent = d.meta;
+    box.className = 'answer ' + (d.grounded ? 'grounded' : 'refused');
+
+    document.getElementById('tab-ok').className = 'tab' + (key === 'ok' ? ' active' : '');
+    document.getElementById('tab-refuse').className = 'tab' + (key === 'refuse' ? ' active' : '');
+  }
+
+  let mediaRecorder, audioChunks = [];
+
+  document.getElementById('btn-record').addEventListener('click', async function() {
+    const btn = this;
+    if (btn.textContent === 'record question') {
+      audioChunks = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.start();
+      btn.textContent = 'stop and send';
+    } else {
+      mediaRecorder.stop();
+      btn.textContent = 'processing...';
+      mediaRecorder.onstop = async function() {
+        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('audio', blob, 'query.wav');
+
+        const resp = await fetch('/api/query', { method: 'POST', body: formData });
+        const data = await resp.json();
+        btn.textContent = 'record question';
+
+        if (data.error) {
+          alert('Pipeline error: ' + data.error);
+          return;
+        }
+
+        document.getElementById('transcript').textContent = data.transcript;
+        document.getElementById('s0').textContent = Math.round(data.stage_timings_ms.stt_ms) + ' ms';
+        document.getElementById('s2').textContent = Math.round(data.stage_timings_ms.retrieval_ms) + ' ms';
+        document.getElementById('s4').textContent = Math.round(data.stage_timings_ms.generation_ms) + ' ms';
+        document.getElementById('s5').textContent = Math.round(data.stage_timings_ms.guardrail_ms) + ' ms';
+        document.getElementById('stotal').textContent = Math.round(data.total_ms) + ' ms';
+
+        const box = document.getElementById('answer-box');
+        document.getElementById('answer-text').textContent = data.answer;
+        document.getElementById('answer-meta').textContent = data.allowed ? 'grounded' : 'refused — outside scope';
+        box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
+      };
+    }
+  });
+</script>
+</body>
+</html>
