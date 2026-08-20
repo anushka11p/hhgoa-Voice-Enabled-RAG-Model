@@ -2,21 +2,22 @@
 
 **HH Goa 2026 — Shortlisting Task 2**
 
-A voice-enabled Retrieval-Augmented Generation pipeline: a user speaks a question, the system transcribes it, retrieves relevant context from the [ai4bharat/MSMARCO-XI](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) dataset, and returns a grounded answer — end to end, under a 200ms latency budget, orchestrated through a proper harness with guardrails.
+A voice-enabled Retrieval-Augmented Generation pipeline: a user speaks a question, the system transcribes it, retrieves relevant context from the [ai4bharat/MSMARCO-XI](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) dataset, and returns a grounded answer — end to end, orchestrated through a proper harness with guardrails.
 
 ```
 Voice input → Speech-to-text → Chunking / Retrieval (vector DB) → Answer generation → Guardrail check → Final answer
 ```
 
-**Live demo:** 
-**Demo video:** 
-**Process video:** 
+**Live demo:** [add Render link here once deployed]
+**Demo video:** [add link here]
+**Process video:** [add link here]
 
 ---
 
 ## Table of contents
 
 - [Overview](#overview)
+- [Current status](#current-status)
 - [Architecture](#architecture)
 - [Dataset](#dataset)
 - [Chunking strategy](#chunking-strategy)
@@ -34,42 +35,58 @@ Voice input → Speech-to-text → Chunking / Retrieval (vector DB) → Answer g
 
 | Requirement | How we meet it |
 |---|---|
-| Speech-to-text | [Sarvam / ElevenLabs — pick one] |
-| Chunking | 4 strategies: fixed-size, semantic, recursive, metadata-aware |
-| Latency | Full pipeline (chunk → retrieve → generate) targets < 200ms |
-| Latency analytics | P50 / P70 / P100 measured across [N] test queries |
-| Harness | Structured orchestrator with retries, timeouts, structured I/O, fallback paths |
-| Guardrails | Off-topic filtering, unsafe-input filtering, grounding/hallucination checks, confidence-based refusal |
+| Speech-to-text | Sarvam (`saarika:v2`), Hindi (`hi-IN`) |
+| Chunking | 4 strategies: fixed-size, semantic, recursive, metadata-aware *(in progress)* |
+| Latency | Full pipeline targets a low end-to-end latency; measured and logged per stage |
+| Latency analytics | P50 / P70 / P100 to be computed across a real test query set |
+| Harness | Structured FastAPI-based orchestrator with retries, structured I/O, error recovery, and a pre-STT silence guardrail |
+| Guardrails | Off-topic handling, unsafe-input handling, and grounding checks *(in progress — currently stubbed)* |
+
+## Current status
+
+This project is under active development. Here's what's real vs. placeholder right now:
+
+**Working and tested:**
+- Speech-to-text (Sarvam) — transcribes real Hindi audio with retry logic
+- Orchestrator/harness — runs the full pipeline shape end to end with per-stage timing and structured error handling
+- Pre-STT silence detection — rejects near-silent audio before it reaches the STT API (calibration ongoing)
+- Demo UI — FastAPI backend + themed frontend with live mic recording
+- Latency logging — every pipeline run is logged to `analytics/latency_log.jsonl`
+
+**Still placeholder (stub functions):**
+- Retrieval — currently returns a hardcoded example chunk, not real dataset search
+- Generation — currently echoes the query back as a stub answer, not a real LLM answer
+- Guardrails (off-topic/unsafe/grounding) — currently always returns "allowed," no real filtering yet
+
+The pipeline architecture, timing, and UI are fully built and wired correctly — once real retrieval, generation, and guardrail modules are dropped in, no structural changes should be needed, only swapping three function imports in `server.py`.
 
 ## Architecture
 
 | Stage | What it does | Key tech |
 |---|---|---|
-| 1. Voice input | Captures mic/audio input from the user | Browser mic / uploaded audio file |
-| 2. Speech-to-text | Converts audio to a clean transcript | Sarvam or ElevenLabs Scribe |
-| 3. Query embedding | Embeds the cleaned transcript for retrieval | sentence-transformers |
-| 4. Retrieval | Hybrid dense + sparse search across the chunk index, then reranked | Qdrant/Chroma + BM25 + cross-encoder reranker |
-| 5. Generation | Produces an answer grounded strictly in retrieved chunks | Claude/GPT API, context-only prompt |
-| 6. Guardrail check | Filters off-topic/unsafe queries, checks grounding, decides whether to answer or refuse | Similarity thresholds, NLI/entailment check |
+| 1. Voice input | Captures mic/audio input from the user | Browser mic (`getUserMedia`/`MediaRecorder`) |
+| 2. Speech-to-text | Converts audio to a clean transcript | Sarvam `saarika:v2`, Hindi |
+| 3. Query embedding | Embeds the cleaned transcript for retrieval | *(pending — retrieval module in progress)* |
+| 4. Retrieval | Hybrid dense + sparse search across the chunk index, then reranked | *(pending — retrieval module in progress)* |
+| 5. Generation | Produces an answer grounded strictly in retrieved chunks | *(pending — generation module in progress)* |
+| 6. Guardrail check | Filters off-topic/unsafe queries, checks grounding, decides whether to answer or refuse | *(pending — guardrail module in progress)* |
 
-All stages run inside `harness/orchestrator.py`, which owns retries, per-stage timeouts, structured Pydantic I/O, logging, and fallback paths.
+All stages run through `harness/orchestrator.py`, which owns retries, structured Pydantic I/O, per-stage timing, and error handling. The FastAPI backend (`server.py`) exposes this as a single `/api/query` endpoint that accepts an audio file and returns transcript, answer, timings, and an `allowed` flag.
 
 ### Interface contracts
 
 ```
-STT output       -> { transcript: str, language: str, confidence: float }
-Retrieval input   -> { query: str, top_k: int, filters: dict }
-Retrieval output  -> { chunks: [ {text, score, metadata} ], retrieval_ms: float }
-Generation input  -> { query: str, chunks: [...] }
-Generation output -> { answer: str, grounded: bool, citations: [chunk_id] }
-Guardrail output  -> { allowed: bool, reason: str|None, final_answer: str }
+STT output        -> { transcript: str, language: str, confidence: float, duration_ms: float }
+Retrieval output   -> { chunks: [ {text, score, metadata} ], retrieval_ms: float }
+Generation output  -> { answer: str, grounded: bool, citations: [chunk_id] }
+Guardrail output   -> { allowed: bool, reason: str|None, final_answer: str }
 ```
 
-These shapes are defined once in `harness/schemas.py` and imported by every module — that's the contract that keeps the STT, retrieval, and generation code compatible.
+These shapes are defined once in `harness/schemas.py` and shared across every module — this is the contract that keeps STT, retrieval, generation, and guardrail code compatible regardless of who builds what.
 
 ## Dataset
 
-We use [`ai4bharat/MSMARCO-XI`](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) — MS MARCO translated into Indic languages. Each example contains a query, an `answers` field, and a list of candidate passages, plus `source_lang` / `target_lang` / translation metadata.
+We use [`ai4bharat/MSMARCO-XI`](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) — MS MARCO translated into Indic languages. The project is built end-to-end in **Hindi**: STT transcribes Hindi speech, and retrieval/generation will operate against the Hindi (`hi`) config of the dataset.
 
 ```python
 from datasets import load_dataset
@@ -77,107 +94,94 @@ from datasets import load_dataset
 ds = load_dataset("ai4bharat/MSMARCO-XI", "hi", split="train")
 ```
 
-For fast local iteration we prototype against the smaller [`ai4bharat/IndicMSMARCO`](https://huggingface.co/datasets/ai4bharat/IndicMSMARCO) (~1,000 rows/language) before running the final build against the full dataset.
-
-Because every row pairs a query with its relevant passage(s), the dataset also serves as our retrieval-quality eval set and our latency-benchmark query set.
+Because every row pairs a query with its relevant passage(s), the dataset also serves as the retrieval-quality eval set and the latency-benchmark query set once retrieval is wired in.
 
 ## Chunking strategy
 
-We deliberately use more than one chunking approach:
+*(In progress.)* Planned approach uses more than one chunking strategy rather than a single fixed-size split:
 
-1. **Fixed-size with overlap** — baseline, ~256 tokens, ~20% overlap
-2. **Semantic chunking** — splits on embedding-similarity breakpoints so chunks stay topically coherent
-3. **Recursive / sentence-aware chunking** — language-aware separators, falling back to fixed-size only when a paragraph is too long
-4. **Metadata-aware chunking** — every chunk tagged with `doc_id`, `passage_id`, `language`, `source_query` for filtered/boosted retrieval
+1. **Fixed-size with overlap** — baseline
+2. **Semantic chunking** — splits on embedding-similarity breakpoints
+3. **Recursive / sentence-aware chunking** — Hindi sentence-boundary aware
+4. **Metadata-aware chunking** — tagged with `doc_id`, `passage_id`, `language`, `source_query`
 
-See [`data/chunking/`](./data/chunking) for implementations and rationale.
+Retrieval is planned to combine dense vector search with BM25 sparse search via reciprocal rank fusion, then rerank with a cross-encoder.
 
 ## Retrieval
 
-Hybrid retrieval combining:
-- Dense vector search (embeddings, cosine similarity)
-- Sparse BM25 keyword search
-- Reciprocal rank fusion to combine both result sets
-- Cross-encoder reranking on the fused top-k before it reaches the LLM
+*(In progress — currently a stub.)* Will combine dense embedding search and BM25 keyword search over the chunked Hindi corpus, fused and reranked before reaching generation.
 
 ## Guardrails
 
-- **Off-topic detection** — query is checked against the corpus domain before retrieval runs
+Currently implemented:
+- **Pre-STT silence detection** — audio is checked for near-silence before being sent to STT, since empty/quiet audio was found to sometimes produce hallucinated transcripts rather than an empty result. Calibration of the detection threshold is ongoing.
+
+Planned, not yet implemented:
+- **Off-topic detection** — reject queries unrelated to the corpus before retrieval runs
 - **Unsafe-input filtering** — basic content moderation on the transcribed query
-- **Grounding check** — after generation, verify the answer's claims are supported by the retrieved chunks
-- **Confidence-threshold refusal** — if retrieval similarity is below threshold, the system responds "I don't have enough information" instead of guessing
+- **Grounding check** — verify generated answers are actually supported by retrieved passages
+- **Confidence-threshold refusal** — respond with "I don't have enough information" when retrieval confidence is low
 
 ## Latency results
 
-Measured across **[N] end-to-end test queries** (pipeline: chunk retrieval → generation → guardrail check).
+*(Pending — full benchmark requires real retrieval and generation to be meaningful.)* Per-stage timings are already being logged for every pipeline run in `analytics/latency_log.jsonl`, including stub-stage runs, so the benchmarking script can be run as soon as real modules are in place.
 
 | Percentile | Latency (ms) |
 |---|---|
-| P50 | [ ] |
-| P70 | [ ] |
-| P100 | [ ] |
-
-Full breakdown per stage and methodology: [`analytics/latency_report.md`](./analytics/latency_report.md)
+| P50 | *pending* |
+| P70 | *pending* |
+| P100 | *pending* |
 
 ## Repo structure
 
 ```
-voice-rag/
+hhgoa-Voice-Enabled-RAG-Model/
 ├── README.md
 ├── requirements.txt
-├── .env.example
-├── data/                  # dataset loading + chunking
-│   ├── load_dataset.py
-│   └── chunking/
-│       ├── fixed_size.py
-│       ├── semantic.py
-│       ├── recursive.py
-│       └── metadata_aware.py
-├── retrieval/             # vector store + hybrid search
-│   ├── vector_store.py
-│   ├── bm25.py
-│   └── reranker.py
-├── stt/                   # speech-to-text
-│   └── sarvam_client.py
-├── harness/                # orchestration + shared schemas
-│   ├── orchestrator.py
-│   ├── schemas.py
-│   └── logging_utils.py
-├── generation/             # answer generation
-│   └── llm_client.py
-├── guardrails/             # safety + grounding checks
-│   ├── off_topic.py
-│   ├── grounding_check.py
-│   └── refusal.py
-├── analytics/               # latency benchmarking
-│   ├── run_benchmark.py
-│   └── latency_report.md
-├── app.py                  # demo UI
+├── .env                    # not committed — holds SARVAM_API_KEY
+├── server.py                # FastAPI backend, single /api/query endpoint
+├── frontend/
+│   └── index.html            # themed demo UI, mic recording + live results
+├── stt/
+│   ├── sarvam_client.py       # Sarvam STT integration + retry logic
+│   └── audio_check.py          # pre-STT silence detection
+├── harness/
+│   ├── orchestrator.py          # pipeline sequencing, timing, error handling
+│   ├── schemas.py                 # shared Pydantic models
+│   ├── stubs.py                     # placeholder retrieval/generation/guardrail functions
+│   └── logging_utils.py               # writes per-run latency logs
+├── analytics/
+│   └── latency_log.jsonl                # per-run timing log
 └── tests/
+    ├── test_stt.py
+    ├── test_orchestrator.py
+    └── sample_audio/
 ```
+
+*(`retrieval/`, `generation/`, and `guardrails/` folders will be added as those modules land.)*
 
 ## Setup
 
 ```bash
-git clone https://github.com/<org>/voice-rag.git
-cd voice-rag
+git clone https://github.com/anushka11p/hhgoa-Voice-Enabled-RAG-Model.git
+cd hhgoa-Voice-Enabled-RAG-Model
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in SARVAM_API_KEY / ELEVENLABS_API_KEY, LLM API key, vector DB config
+echo "SARVAM_API_KEY=your_key_here" > .env
 ```
 
 ## Running the pipeline
 
 ```bash
-# 1. Build the index (one-time)
-python data/load_dataset.py
-python retrieval/vector_store.py --build-index
+# Run the backend + demo UI
+uvicorn server:app --reload
+# then open http://127.0.0.1:8000
+```
 
-# 2. Run the demo app
-python app.py
-
-# 3. Run the latency benchmark
-python analytics/run_benchmark.py --queries 100
+```bash
+# Run individual tests
+python tests/test_stt.py
+python tests/test_orchestrator.py
 ```
 
 ## Team
@@ -186,7 +190,7 @@ python analytics/run_benchmark.py --queries 100
 |---|---|
 | Anushka | Voice input, STT, harness/orchestration, demo UI, latency instrumentation |
 | RamyaPriya | Dataset processing, chunking strategies, vector DB, hybrid retrieval |
-| Saranya | Generation, guardrails, latency analytics, README/deployment |
+| Saranya | Generation, guardrails, latency analytics, deployment |
 
 ---
 
