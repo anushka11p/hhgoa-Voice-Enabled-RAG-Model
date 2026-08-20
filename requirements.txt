@@ -8,6 +8,7 @@ certifi==2026.7.22
 charset-normalizer==3.5.1
 click==8.4.2
 fastapi==0.141.1
+git-filter-repo==2.47.0
 h11==0.16.0
 httptools==0.8.0
 idna==3.19
@@ -16,13 +17,10 @@ Jinja2==3.1.6
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 MarkupSafe==3.0.3
-narwhals==2.24.0
 numpy==2.5.2
 packaging==26.3
-pandas==3.0.5
 pillow==12.3.0
 protobuf==7.35.1
-pyarrow==24.0.0
 pydantic==2.13.4
 pydantic_core==2.46.4
 python-dateutil==2.9.0.post0

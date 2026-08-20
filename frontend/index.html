@@ -1231,6 +1231,7 @@
       mediaRecorder.onstop = async function() {
         try {
           const blob = new Blob(audioChunks, { type: 'audio/wav' });
+          console.log('Recorded blob size:', blob.size, 'bytes');
           const formData = new FormData();
           formData.append('audio', blob, 'query.wav');
 
