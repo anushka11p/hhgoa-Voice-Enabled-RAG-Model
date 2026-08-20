@@ -162,7 +162,7 @@
       </div>
       <div class="badges">
         <span class="badge badge-lang">hi-IN</span>
-        <span class="badge badge-status">ready</span>
+        <span class="badge badge-status" id="status-badge">ready</span>
       </div>
     </div>
 
@@ -290,6 +290,7 @@
       mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
       mediaRecorder.start();
       btn.textContent = 'stop and send';
+      document.getElementById('status-badge').textContent = 'listening';
     } else {
       mediaRecorder.stop();
       btn.textContent = 'processing...';
@@ -301,22 +302,34 @@
         const resp = await fetch('/api/query', { method: 'POST', body: formData });
         const data = await resp.json();
         btn.textContent = 'record question';
+        document.getElementById('status-badge').textContent = 'ready';
 
         if (data.error) {
           alert('Pipeline error: ' + data.error);
           return;
         }
 
+        // clear any stale UI state from the last query before showing this one
+        document.getElementById('tab-ok').className = 'tab';
+        document.getElementById('tab-refuse').className = 'tab';
+
         document.getElementById('transcript').textContent = data.transcript;
+
+        // stub retrieval returns no real chunks yet, so hide the panel instead of
+        // showing leftover example passages that have nothing to do with this query
+        document.getElementById('passages-wrap').style.display = 'none';
+
         document.getElementById('s0').textContent = Math.round(data.stage_timings_ms.stt_ms) + ' ms';
+        document.getElementById('s1').textContent = '—';
         document.getElementById('s2').textContent = Math.round(data.stage_timings_ms.retrieval_ms) + ' ms';
+        document.getElementById('s3').textContent = '—';
         document.getElementById('s4').textContent = Math.round(data.stage_timings_ms.generation_ms) + ' ms';
         document.getElementById('s5').textContent = Math.round(data.stage_timings_ms.guardrail_ms) + ' ms';
         document.getElementById('stotal').textContent = Math.round(data.total_ms) + ' ms';
 
         const box = document.getElementById('answer-box');
         document.getElementById('answer-text').textContent = data.answer;
-        document.getElementById('answer-meta').textContent = data.allowed ? 'grounded' : 'refused — outside scope';
+        document.getElementById('answer-meta').textContent = data.allowed ? 'grounded (stub — retrieval not wired in yet)' : 'refused — outside scope';
         box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
       };
     }

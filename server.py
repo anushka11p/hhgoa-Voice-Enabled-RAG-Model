@@ -1,3 +1,4 @@
+from stt.audio_check import is_likely_silence
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +18,8 @@ async def query(audio: UploadFile = File(...)):
         tmp.write(await audio.read())
         tmp_path = tmp.name
 
+        if is_likely_silence(tmp_path):
+            return {"error": "Audio appears to be silence — no speech detected. Please try again."}
     try:
         result = run_pipeline(tmp_path, stub_retrieve, stub_generate, stub_guardrail)
         log_run(result)
