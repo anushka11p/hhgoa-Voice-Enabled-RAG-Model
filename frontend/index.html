@@ -346,6 +346,27 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
+  .ask-row{display:flex;gap:8px;margin-top:14px;width:100%;}
+  #ask-input{
+    flex:1;height:34px;padding:0 12px;font-size:12px;font-family:var(--font-mono);
+    background:rgba(255,255,255,0.06);color:var(--white);
+    border:1px solid rgba(255,255,255,0.18);border-radius:0;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  #ask-input::placeholder{color:rgba(255,255,255,0.4);}
+  #btn-ask{
+    height:34px;padding:0 16px;font-size:12px;border:none;cursor:pointer;font-weight:700;
+    font-family:var(--font-mono);background:var(--yellow);color:var(--ink);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  #btn-ask:hover{background:var(--yellow-dark);color:var(--white);}
+  .guard-badge{
+    display:inline-block;margin-left:8px;padding:2px 8px;font-size:9.5px;font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;border-radius:3px;
+    background:var(--pink);color:var(--white);
+  }
+  .guard-badge.ok{background:var(--green);color:var(--yellow);}
+  .budget-ok{color:var(--yellow);} .budget-over{color:var(--pink);}
   .field-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;opacity:0.6;margin:0 0 8px;font-weight:700;}
   .transcript{font-family:var(--font-display);font-size:22px;margin:0 0 24px;line-height:1.3;font-weight:600;}
 
@@ -1067,6 +1088,11 @@
           </div>
           <div class="record-container">
             <button id="btn-record">record question</button>
+            <div class="ask-row">
+              <input id="ask-input" type="text" autocomplete="off"
+                     placeholder="…or type a question in Hindi and press Enter" />
+              <button id="btn-ask">ask</button>
+            </div>
             <div id="waveform" class="waveform">
               <span class="bar"></span>
               <span class="bar"></span>
@@ -1103,10 +1129,10 @@
     </div>
 
     <div class="stats">
-      <div><p class="stat-label">P50</p><p class="stat-val">148 ms</p></div>
-      <div><p class="stat-label">P70</p><p class="stat-val">183 ms</p></div>
-      <div><p class="stat-label">P100</p><p class="stat-val">412 ms</p></div>
-      <div class="stats-note">retrieval stage only, 80 test queries</div>
+      <div><p class="stat-label">P50</p><p class="stat-val" id="stat-p50">—</p></div>
+      <div><p class="stat-label">P70</p><p class="stat-val" id="stat-p70">—</p></div>
+      <div><p class="stat-label">P100</p><p class="stat-val" id="stat-p100">—</p></div>
+      <div class="stats-note" id="stats-note">loading live metrics…</div>
     </div>
   </div>
 </div>
@@ -1185,6 +1211,136 @@
     document.getElementById('tab-refuse').className = 'tab' + (key === 'refuse' ? ' active' : '');
   }
 
+  // ---- shared result renderer -------------------------------------------
+  // Both the voice path (/api/query) and the text path (/api/ask) return the
+  // same payload shape, so they render through one function.
+  function ms(v){ return (v === undefined || v === null) ? '—' : Math.round(v) + ' ms'; }
+
+  function renderResult(data){
+    document.getElementById('tab-ok').className = 'tab';
+    document.getElementById('tab-refuse').className = 'tab';
+
+    document.getElementById('transcript').textContent = data.transcript || '—';
+
+    const t = data.stage_timings_ms || {};
+    const diag = data.diagnostics || {};
+    // Retrieve = the search stages only; rerank is broken out separately.
+    const searchMs = (diag.dense_ms || 0) + (diag.bm25_ms || 0) + (diag.rrf_ms || 0);
+    const guardMs = (t.guardrail_pre_ms || 0) + (t.guardrail_post_ms || 0)
+                    + (t.guardrail_ms || 0);
+
+    document.getElementById('s0').textContent = t.stt_ms === undefined ? 'text input' : ms(t.stt_ms);
+    document.getElementById('s1').textContent = ms(t.embed_ms);
+    document.getElementById('s2').textContent = searchMs ? ms(searchMs) : '—';
+    document.getElementById('s3').textContent = data.reranked ? ms(diag.rerank_ms) : 'skipped';
+    document.getElementById('s4').textContent = ms(t.generation_ms);
+    document.getElementById('s5').textContent = ms(guardMs);
+
+    const totalEl = document.getElementById('stotal');
+    totalEl.textContent = ms(data.core_ms) + ' core';
+    totalEl.className = data.within_budget ? 'budget-ok' : 'budget-over';
+
+    // Retrieved passages -- real chunks now, or hidden on a refusal.
+    const wrap = document.getElementById('passages-wrap');
+    const chunks = data.chunks || [];
+    if (chunks.length) {
+      wrap.style.display = '';
+      document.getElementById('passages').innerHTML = chunks.map(function(c){
+        const cited = (data.citations || []).indexOf(c.chunk_id) !== -1;
+        const text = (c.text || '').slice(0, 320);
+        return '<div class="passage">'
+             + '<div class="passage-meta"><span>' + (c.passage_id || c.chunk_id) + '</span>'
+             + '<b>score ' + (c.score !== undefined ? c.score.toFixed(3) : '—') + '</b></div>'
+             + '<p class="passage-text">' + (cited ? '<mark>' : '')
+             + escapeHtml(text) + (cited ? '</mark>' : '') + '</p></div>';
+      }).join('');
+    } else {
+      wrap.style.display = 'none';
+    }
+
+    const box = document.getElementById('answer-box');
+    document.getElementById('answer-text').textContent = data.answer;
+
+    let meta;
+    if (data.allowed) {
+      meta = 'grounded in ' + ((data.citations || []).join(', ') || 'retrieved passages');
+      meta += ' · ' + data.generation_mode;
+      if (!data.reranked) meta += ' · rerank skipped for latency';
+    } else {
+      meta = 'refused — ' + (data.refusal_reason || data.guardrail_stage || 'out of scope');
+    }
+    const metaEl = document.getElementById('answer-meta');
+    metaEl.textContent = meta;
+    const badge = document.createElement('span');
+    badge.className = 'guard-badge' + (data.allowed ? ' ok' : '');
+    badge.textContent = data.allowed ? 'allowed' : (data.guardrail_stage || 'refused');
+    metaEl.appendChild(badge);
+
+    box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  // ---- text path: same RAG core, no microphone or STT key needed ----------
+  async function askText(){
+    const input = document.getElementById('ask-input');
+    const q = input.value.trim();
+    if (!q) return;
+    const statusBadge = document.getElementById('status-badge');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    closeErrorBanner();
+    statusBadge.textContent = 'processing';
+    statusBadge.classList.add('processing');
+    loadingOverlay.classList.add('active');
+    try {
+      const resp = await fetch('/api/ask', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ query: q })
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+      renderResult(data);
+      loadMetrics();
+    } catch (err) {
+      showError('Pipeline error: ' + err.message);
+    } finally {
+      statusBadge.textContent = 'ready';
+      statusBadge.classList.remove('processing');
+      loadingOverlay.classList.remove('active');
+    }
+  }
+
+  async function loadMetrics(){
+    try {
+      const r = await fetch('/api/metrics');
+      const m = await r.json();
+      if (!m || !m.runs) {
+        document.getElementById('stats-note').textContent =
+          'no runs logged yet — ask a question to populate';
+        return;
+      }
+      document.getElementById('stat-p50').textContent  = Math.round(m.core_ms.p50) + ' ms';
+      document.getElementById('stat-p70').textContent  = Math.round(m.core_ms.p70) + ' ms';
+      document.getElementById('stat-p100').textContent = Math.round(m.core_ms.p100) + ' ms';
+      document.getElementById('stats-note').textContent =
+        'RAG core (retrieval + generation + guardrails), last ' + m.runs +
+        ' runs · ' + m.within_budget_pct + '% within the ' + m.budget_ms + ' ms budget';
+    } catch (e) {
+      document.getElementById('stats-note').textContent = 'metrics unavailable';
+    }
+  }
+  loadMetrics();
+
+  document.getElementById('btn-ask').addEventListener('click', askText);
+  document.getElementById('ask-input').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') askText();
+  });
+
   let mediaRecorder, audioChunks = [];
 
   document.getElementById('btn-record').addEventListener('click', async function() {
@@ -1252,28 +1408,7 @@
             return;
           }
 
-          // clear any stale UI state from the last query before showing this one
-          document.getElementById('tab-ok').className = 'tab';
-          document.getElementById('tab-refuse').className = 'tab';
-
-          document.getElementById('transcript').textContent = data.transcript;
-
-          // stub retrieval returns no real chunks yet, so hide the panel instead of
-          // showing leftover example passages that have nothing to do with this query
-          document.getElementById('passages-wrap').style.display = 'none';
-
-          document.getElementById('s0').textContent = Math.round(data.stage_timings_ms.stt_ms) + ' ms';
-          document.getElementById('s1').textContent = '—';
-          document.getElementById('s2').textContent = Math.round(data.stage_timings_ms.retrieval_ms) + ' ms';
-          document.getElementById('s3').textContent = '—';
-          document.getElementById('s4').textContent = Math.round(data.stage_timings_ms.generation_ms) + ' ms';
-          document.getElementById('s5').textContent = Math.round(data.stage_timings_ms.guardrail_ms) + ' ms';
-          document.getElementById('stotal').textContent = Math.round(data.total_ms) + ' ms';
-
-          const box = document.getElementById('answer-box');
-          document.getElementById('answer-text').textContent = data.answer;
-          document.getElementById('answer-meta').textContent = data.allowed ? 'grounded (stub — retrieval not wired in yet)' : 'refused — outside scope';
-          box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
+          renderResult(data);
 
         } catch (err) {
           btn.textContent = 'record question';

@@ -1,0 +1,136 @@
+{
+  "config": {
+    "lang": "hi",
+    "embed_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "rerank_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "chunk_strategy": "recursive",
+    "generation_mode": "extractive",
+    "n_queries": 100,
+    "core_budget_ms": 200.0,
+    "torch_threads": 1
+  },
+  "core_latency_ms": {
+    "p50": 72.073,
+    "p70": 82.158,
+    "p90": 96.306,
+    "p95": 105.118,
+    "p100": 122.354,
+    "mean": 73.502,
+    "n": 100
+  },
+  "wall_latency_ms": {
+    "p50": 72.124,
+    "p70": 82.212,
+    "p90": 96.357,
+    "p95": 105.193,
+    "p100": 127.982,
+    "mean": 73.608,
+    "n": 100
+  },
+  "stages_ms": {
+    "bm25_ms": {
+      "p50": 1.941,
+      "p70": 2.33,
+      "p90": 3.298,
+      "p95": 4.219,
+      "p100": 5.908,
+      "mean": 2.163,
+      "n": 94
+    },
+    "dense_ms": {
+      "p50": 0.137,
+      "p70": 0.144,
+      "p90": 0.165,
+      "p95": 0.196,
+      "p100": 0.357,
+      "mean": 0.142,
+      "n": 94
+    },
+    "embed_ms": {
+      "p50": 14.893,
+      "p70": 16.711,
+      "p90": 25.975,
+      "p95": 29.744,
+      "p100": 33.856,
+      "mean": 16.99,
+      "n": 100
+    },
+    "generation_ms": {
+      "p50": 0.271,
+      "p70": 0.303,
+      "p90": 0.39,
+      "p95": 0.426,
+      "p100": 0.506,
+      "mean": 0.281,
+      "n": 94
+    },
+    "guardrail_post_ms": {
+      "p50": 0.064,
+      "p70": 0.072,
+      "p90": 0.084,
+      "p95": 0.095,
+      "p100": 0.265,
+      "mean": 0.067,
+      "n": 94
+    },
+    "guardrail_pre_ms": {
+      "p50": 0.04,
+      "p70": 0.047,
+      "p90": 0.068,
+      "p95": 0.077,
+      "p100": 0.204,
+      "mean": 0.045,
+      "n": 100
+    },
+    "rerank_ms": {
+      "p50": 54.982,
+      "p70": 61.647,
+      "p90": 69.987,
+      "p95": 80.733,
+      "p100": 92.835,
+      "mean": 57.305,
+      "n": 94
+    },
+    "retrieval_ms": {
+      "p50": 56.683,
+      "p70": 64.365,
+      "p90": 72.507,
+      "p95": 84.903,
+      "p100": 96.396,
+      "mean": 59.724,
+      "n": 94
+    },
+    "rrf_ms": {
+      "p50": 0.036,
+      "p70": 0.043,
+      "p90": 0.078,
+      "p95": 0.092,
+      "p100": 0.13,
+      "mean": 0.045,
+      "n": 94
+    }
+  },
+  "budget": {
+    "target_ms": 200.0,
+    "within_budget": 100,
+    "over_budget": 0,
+    "pct_within": 100.0,
+    "rerank_skipped": 6
+  },
+  "retrieval_quality": {
+    "recall_at_1": 0.69,
+    "recall_at_5": 0.74,
+    "mrr": 0.7108,
+    "note": "scored on answered+refused alike; refusals return no chunks"
+  },
+  "guardrails": {
+    "answered": 92,
+    "refused": 8,
+    "refusal_rate": 0.08,
+    "by_stage": {
+      "low_confidence": 2,
+      "off_topic": 6
+    }
+  },
+  "generated_at": "2026-08-22T19:34:19"
+}
