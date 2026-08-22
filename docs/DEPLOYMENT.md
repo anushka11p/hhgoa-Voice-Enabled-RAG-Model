@@ -21,6 +21,10 @@ out Render's free tier and most "hobby" plans.
 CPU Basic gives 2 vCPU / 16 GB RAM at no cost, and caches Hugging Face model
 downloads — the best fit for this workload.
 
+The YAML frontmatter at the top of `README.md` is what configures the Space
+(`sdk: docker`, `app_port: 7860`). Spaces reads it on every push -- if it is
+removed, the Space will not know how to build.
+
 1. Create a Space at <https://huggingface.co/new-space>
    - **SDK:** Docker
    - **Hardware:** CPU basic (free)

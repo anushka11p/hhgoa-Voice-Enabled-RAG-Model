@@ -1,3 +1,14 @@
+---
+title: Setu Voice RAG
+emoji: 🎙️
+colorFrom: green
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Speak a question in Hindi, get a grounded answer or an honest no.
+---
+
 # Voice-Enabled RAG System
 
 **HH Goa 2026 — Shortlisting Task 2** · `#RAGInGoa`
