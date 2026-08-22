@@ -22,9 +22,19 @@ reranking, grounded generation, and guardrails that know when not to answer.
 Voice → Speech-to-text → Chunking / Retrieval (vector DB) → Generation → Guardrail → Answer
 ```
 
-- **Live demo:** _add the deployed URL here — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)_
+- **Live demo:** https://olive-view-none-format.trycloudflare.com *(temporary Cloudflare tunnel — see note below)*
 - **Architecture deep-dive:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Latency report:** [analytics/latency_report.md](analytics/latency_report.md)
+
+> **About the live link.** It is a Cloudflare quick tunnel to a running
+> instance, not a hosted deployment, so it is only up while that instance is.
+> Hugging Face Spaces now requires a paid plan for Docker/Gradio Spaces (only
+> Static Spaces are free), and this stack needs ~1.5 GB RAM for its two
+> transformer models, which rules out the free tiers we could reach. A
+> `Dockerfile` and `docs/DEPLOYMENT.md` are included and ready for any host
+> with enough memory. If the link is down, the project runs locally in two
+> commands — see [Quickstart](#quickstart); the index is committed, so there
+> is nothing to rebuild.
 
 ---
 
