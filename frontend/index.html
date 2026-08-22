@@ -346,6 +346,27 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
+  .ask-row{display:flex;gap:8px;margin-top:14px;width:100%;}
+  #ask-input{
+    flex:1;height:34px;padding:0 12px;font-size:12px;font-family:var(--font-mono);
+    background:rgba(255,255,255,0.06);color:var(--white);
+    border:1px solid rgba(255,255,255,0.18);border-radius:0;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  #ask-input::placeholder{color:rgba(255,255,255,0.4);}
+  #btn-ask{
+    height:34px;padding:0 16px;font-size:12px;border:none;cursor:pointer;font-weight:700;
+    font-family:var(--font-mono);background:var(--yellow);color:var(--ink);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  #btn-ask:hover{background:var(--yellow-dark);color:var(--white);}
+  .guard-badge{
+    display:inline-block;margin-left:8px;padding:2px 8px;font-size:9.5px;font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;border-radius:3px;
+    background:var(--pink);color:var(--white);
+  }
+  .guard-badge.ok{background:var(--green);color:var(--yellow);}
+  .budget-ok{color:var(--yellow);} .budget-over{color:var(--pink);}
   .field-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;opacity:0.6;margin:0 0 8px;font-weight:700;}
   .transcript{font-family:var(--font-display);font-size:22px;margin:0 0 24px;line-height:1.3;font-weight:600;}
 
@@ -1062,11 +1083,16 @@
 
         <div class="controls-row">
           <div class="tabs">
-            <button class="tab active" id="tab-ok" onclick="showCase('ok')">In-domain question</button>
-            <button class="tab" id="tab-refuse" onclick="showCase('refuse')">Off-topic question</button>
+            <button class="tab active" id="tab-ok" onclick="showCase('ok')">Example: in-domain</button>
+            <button class="tab" id="tab-refuse" onclick="showCase('refuse')">Example: off-topic</button>
           </div>
           <div class="record-container">
             <button id="btn-record">record question</button>
+            <div class="ask-row">
+              <input id="ask-input" type="text" autocomplete="off"
+                     placeholder="…or type a question in Hindi and press Enter" />
+              <button id="btn-ask">ask</button>
+            </div>
             <div id="waveform" class="waveform">
               <span class="bar"></span>
               <span class="bar"></span>
@@ -1103,10 +1129,10 @@
     </div>
 
     <div class="stats">
-      <div><p class="stat-label">P50</p><p class="stat-val">148 ms</p></div>
-      <div><p class="stat-label">P70</p><p class="stat-val">183 ms</p></div>
-      <div><p class="stat-label">P100</p><p class="stat-val">412 ms</p></div>
-      <div class="stats-note">retrieval stage only, 80 test queries</div>
+      <div><p class="stat-label">P50</p><p class="stat-val" id="stat-p50">—</p></div>
+      <div><p class="stat-label">P70</p><p class="stat-val" id="stat-p70">—</p></div>
+      <div><p class="stat-label">P100</p><p class="stat-val" id="stat-p100">—</p></div>
+      <div class="stats-note" id="stats-note">loading live metrics…</div>
     </div>
   </div>
 </div>
@@ -1178,14 +1204,216 @@
 
     var box = document.getElementById('answer-box');
     document.getElementById('answer-text').textContent = d.answer;
-    document.getElementById('answer-meta').textContent = d.meta;
+    document.getElementById('answer-meta').textContent = d.meta + ' · canned example, not a live run';
     box.className = 'answer ' + (d.grounded ? 'grounded' : 'refused');
 
     document.getElementById('tab-ok').className = 'tab' + (key === 'ok' ? ' active' : '');
     document.getElementById('tab-refuse').className = 'tab' + (key === 'refuse' ? ' active' : '');
   }
 
-  let mediaRecorder, audioChunks = [];
+  // ---- shared result renderer -------------------------------------------
+  // Both the voice path (/api/query) and the text path (/api/ask) return the
+  // same payload shape, so they render through one function.
+  function ms(v){ return (v === undefined || v === null) ? '—' : Math.round(v) + ' ms'; }
+
+  function renderResult(data){
+    document.getElementById('tab-ok').className = 'tab';
+    document.getElementById('tab-refuse').className = 'tab';
+
+    document.getElementById('transcript').textContent = data.transcript || '—';
+
+    const t = data.stage_timings_ms || {};
+    const diag = data.diagnostics || {};
+    // Retrieve = the search stages only; rerank is broken out separately.
+    const searchMs = (diag.dense_ms || 0) + (diag.bm25_ms || 0) + (diag.rrf_ms || 0);
+    const guardMs = (t.guardrail_pre_ms || 0) + (t.guardrail_post_ms || 0)
+                    + (t.guardrail_ms || 0);
+
+    document.getElementById('s0').textContent = t.stt_ms === undefined ? 'text input' : ms(t.stt_ms);
+    document.getElementById('s1').textContent = ms(t.embed_ms);
+    document.getElementById('s2').textContent = searchMs ? ms(searchMs) : '—';
+    document.getElementById('s3').textContent = data.reranked ? ms(diag.rerank_ms) : 'skipped';
+    document.getElementById('s4').textContent = ms(t.generation_ms);
+    document.getElementById('s5').textContent = ms(guardMs);
+
+    const totalEl = document.getElementById('stotal');
+    totalEl.textContent = ms(data.core_ms) + ' core';
+    totalEl.className = data.within_budget ? 'budget-ok' : 'budget-over';
+
+    // Retrieved passages -- real chunks now, or hidden on a refusal.
+    const wrap = document.getElementById('passages-wrap');
+    const chunks = data.chunks || [];
+    if (chunks.length) {
+      wrap.style.display = '';
+      document.getElementById('passages').innerHTML = chunks.map(function(c){
+        const cited = (data.citations || []).indexOf(c.chunk_id) !== -1;
+        const text = (c.text || '').slice(0, 320);
+        return '<div class="passage">'
+             + '<div class="passage-meta"><span>' + (c.passage_id || c.chunk_id) + '</span>'
+             + '<b>score ' + (c.score !== undefined ? c.score.toFixed(3) : '—') + '</b></div>'
+             + '<p class="passage-text">' + (cited ? '<mark>' : '')
+             + escapeHtml(text) + (cited ? '</mark>' : '') + '</p></div>';
+      }).join('');
+    } else {
+      wrap.style.display = 'none';
+    }
+
+    const box = document.getElementById('answer-box');
+    document.getElementById('answer-text').textContent = data.answer;
+
+    let meta;
+    if (data.allowed) {
+      meta = 'grounded in ' + ((data.citations || []).join(', ') || 'retrieved passages');
+      meta += ' · ' + data.generation_mode;
+      if (!data.reranked) meta += ' · rerank skipped for latency';
+    } else {
+      meta = 'refused — ' + (data.refusal_reason || data.guardrail_stage || 'out of scope');
+    }
+    const metaEl = document.getElementById('answer-meta');
+    metaEl.textContent = meta;
+    const badge = document.createElement('span');
+    badge.className = 'guard-badge' + (data.allowed ? ' ok' : '');
+    badge.textContent = data.allowed ? 'allowed' : (data.guardrail_stage || 'refused');
+    metaEl.appendChild(badge);
+
+    box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  // ---- text path: same RAG core, no microphone or STT key needed ----------
+  async function askText(){
+    const input = document.getElementById('ask-input');
+    const q = input.value.trim();
+    if (!q) return;
+    const statusBadge = document.getElementById('status-badge');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    closeErrorBanner();
+    statusBadge.textContent = 'processing';
+    statusBadge.classList.add('processing');
+    loadingOverlay.classList.add('active');
+    try {
+      const resp = await fetch('/api/ask', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ query: q })
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+      renderResult(data);
+      loadMetrics();
+    } catch (err) {
+      showError('Pipeline error: ' + err.message);
+    } finally {
+      statusBadge.textContent = 'ready';
+      statusBadge.classList.remove('processing');
+      loadingOverlay.classList.remove('active');
+    }
+  }
+
+  // On first load the panel would otherwise show the hardcoded sample values
+  // that sit in the markup. In a judged demo those read as real results, so
+  // blank them out and invite a query instead.
+  function resetPanel(){
+    ['s0','s1','s2','s3','s4','s5'].forEach(function(id){
+      document.getElementById(id).textContent = '—';
+    });
+    var total = document.getElementById('stotal');
+    total.textContent = '—';
+    total.className = '';
+    document.getElementById('transcript').textContent = 'Ask a question to run the pipeline.';
+    document.getElementById('passages-wrap').style.display = 'none';
+    var box = document.getElementById('answer-box');
+    box.className = 'answer';
+    document.getElementById('answer-text').textContent =
+      'No query yet. Record a question, type one below, or load an example.';
+    document.getElementById('answer-meta').textContent = '';
+    document.getElementById('tab-ok').className = 'tab';
+    document.getElementById('tab-refuse').className = 'tab';
+  }
+  resetPanel();
+
+  async function loadMetrics(){
+    try {
+      const r = await fetch('/api/metrics');
+      const m = await r.json();
+      if (!m || !m.runs) {
+        document.getElementById('stats-note').textContent =
+          'no runs logged yet — ask a question to populate';
+        return;
+      }
+      document.getElementById('stat-p50').textContent  = Math.round(m.core_ms.p50) + ' ms';
+      document.getElementById('stat-p70').textContent  = Math.round(m.core_ms.p70) + ' ms';
+      document.getElementById('stat-p100').textContent = Math.round(m.core_ms.p100) + ' ms';
+      document.getElementById('stats-note').textContent =
+        'RAG core (retrieval + generation + guardrails), last ' + m.runs +
+        ' runs · ' + m.within_budget_pct + '% within the ' + m.budget_ms + ' ms budget';
+    } catch (e) {
+      document.getElementById('stats-note').textContent = 'metrics unavailable';
+    }
+  }
+  loadMetrics();
+
+  document.getElementById('btn-ask').addEventListener('click', askText);
+  document.getElementById('ask-input').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') askText();
+  });
+
+  // ---- audio capture format ---------------------------------------------
+  // MediaRecorder cannot produce WAV in any current browser
+  // (isTypeSupported('audio/wav') === false) -- it records WebM/Opus or MP4.
+  // The old code wrapped those bytes in a Blob labelled 'audio/wav', which
+  // mislabelled rather than converted: Sarvam received a corrupt WAV, and the
+  // pre-STT silence gate could not parse it and silently passed everything
+  // through. So we record in whatever the browser actually supports, then
+  // decode and re-encode to real 16-bit PCM WAV before upload.
+  function pickMimeType(){
+    const prefs = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+    for (const t of prefs) if (MediaRecorder.isTypeSupported(t)) return t;
+    return '';   // let the browser choose
+  }
+
+  const TARGET_RATE = 16000;   // Sarvam handles 16 kHz mono well and it keeps uploads small
+
+  function encodeWav(samples, sampleRate){
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buf);
+    const wr = (off, str) => { for (let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); };
+    wr(0,'RIFF'); view.setUint32(4, 36 + samples.length*2, true); wr(8,'WAVE');
+    wr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);   // PCM
+    view.setUint16(22,1,true);                                             // mono
+    view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate*2,true);
+    view.setUint16(32,2,true); view.setUint16(34,16,true);                 // 16-bit
+    wr(36,'data'); view.setUint32(40, samples.length*2, true);
+    let off = 44;
+    for (let i=0;i<samples.length;i++,off+=2){
+      const c = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, c < 0 ? c*0x8000 : c*0x7FFF, true);
+    }
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  async function toWavBlob(blob){
+    const bytes = await blob.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await ctx.decodeAudioData(bytes);
+    // Downmix to mono and resample to TARGET_RATE in one offline pass.
+    const frames = Math.ceil(decoded.duration * TARGET_RATE);
+    const off = new OfflineAudioContext(1, frames, TARGET_RATE);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    ctx.close();
+    return encodeWav(rendered.getChannelData(0), TARGET_RATE);
+  }
+
+  let mediaRecorder, audioChunks = [], micStream = null;
 
   document.getElementById('btn-record').addEventListener('click', async function() {
     const btn = this;
@@ -1200,9 +1428,10 @@
     if (btn.textContent === 'record question') {
       audioChunks = [];
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = pickMimeType();
+        mediaRecorder = new MediaRecorder(micStream, mimeType ? { mimeType } : undefined);
+        mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) audioChunks.push(e.data); };
         mediaRecorder.start();
         
         btn.textContent = 'stop and send';
@@ -1211,14 +1440,11 @@
         micBtn.classList.add('active');
         waveform.classList.add('active');
       } catch (err) {
+        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
         showError('Microphone access denied: ' + err.message);
         statusBadge.textContent = 'error';
       }
     } else {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-      
       btn.textContent = 'processing...';
       btn.classList.remove('recording');
       statusBadge.textContent = 'processing';
@@ -1228,18 +1454,28 @@
       loadingOverlay.classList.add('active');
       pipelineRail.classList.add('loading');
 
+      // Assign the handler before calling stop() -- stop() fires the event, so
+      // wiring it afterwards was a race.
       mediaRecorder.onstop = async function() {
         try {
-          const blob = new Blob(audioChunks, { type: 'audio/wav' });
-          console.log('Recorded blob size:', blob.size, 'bytes');
+          // Release the microphone as soon as we have the audio, so the
+          // browser's recording indicator does not stay on.
+          if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+
+          const recorded = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (!recorded.size) throw new Error('No audio was captured. Check microphone permissions.');
+
+          // Re-encode to real PCM WAV -- see toWavBlob() for why.
+          const blob = await toWavBlob(recorded);
           const formData = new FormData();
           formData.append('audio', blob, 'query.wav');
 
           const resp = await fetch('/api/query', { method: 'POST', body: formData });
-          if (!resp.ok) {
-            throw new Error(`Server returned HTTP ${resp.status}`);
-          }
-          const data = await resp.json();
+          // Read the body even on a non-2xx: the server sends a useful message
+          // (missing API key, STT failure) that a bare status code throws away.
+          let data;
+          try { data = await resp.json(); }
+          catch (e) { throw new Error(`Server returned HTTP ${resp.status}`); }
 
           btn.textContent = 'record question';
           statusBadge.textContent = 'ready';
@@ -1252,28 +1488,7 @@
             return;
           }
 
-          // clear any stale UI state from the last query before showing this one
-          document.getElementById('tab-ok').className = 'tab';
-          document.getElementById('tab-refuse').className = 'tab';
-
-          document.getElementById('transcript').textContent = data.transcript;
-
-          // stub retrieval returns no real chunks yet, so hide the panel instead of
-          // showing leftover example passages that have nothing to do with this query
-          document.getElementById('passages-wrap').style.display = 'none';
-
-          document.getElementById('s0').textContent = Math.round(data.stage_timings_ms.stt_ms) + ' ms';
-          document.getElementById('s1').textContent = '—';
-          document.getElementById('s2').textContent = Math.round(data.stage_timings_ms.retrieval_ms) + ' ms';
-          document.getElementById('s3').textContent = '—';
-          document.getElementById('s4').textContent = Math.round(data.stage_timings_ms.generation_ms) + ' ms';
-          document.getElementById('s5').textContent = Math.round(data.stage_timings_ms.guardrail_ms) + ' ms';
-          document.getElementById('stotal').textContent = Math.round(data.total_ms) + ' ms';
-
-          const box = document.getElementById('answer-box');
-          document.getElementById('answer-text').textContent = data.answer;
-          document.getElementById('answer-meta').textContent = data.allowed ? 'grounded (stub — retrieval not wired in yet)' : 'refused — outside scope';
-          box.className = 'answer ' + (data.allowed ? 'grounded' : 'refused');
+          renderResult(data);
 
         } catch (err) {
           btn.textContent = 'record question';
@@ -1284,6 +1499,10 @@
           showError('Pipeline error: ' + err.message);
         }
       };
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
     }
   });
   // --- 3D Scroll-Driven Intro Engine ---

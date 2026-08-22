@@ -17,7 +17,7 @@ def get_recursive_chunks(documents: List[Dict[str, Any]], chunk_size: int = 500,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         length_function=len,
-        separators=["\n\n", "\n", " ", ""]
+        separators=["\n\n", "\n", "\u0964 ", "\u0964", ". ", " ", ""]
     )
     
     chunked_data = []

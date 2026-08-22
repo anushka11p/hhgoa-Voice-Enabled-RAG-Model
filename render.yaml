@@ -1,0 +1,25 @@
+# Render blueprint.
+#
+# NOTE ON PLAN SIZE: the free 512 MB instance will OOM. This stack holds two
+# transformer models plus a FAISS index in memory and needs ~1.5 GB resident,
+# so `standard` is the smallest plan that actually runs. Hugging Face Spaces
+# (CPU basic, 16 GB, free) is the cheaper host for this workload -- see
+# docs/DEPLOYMENT.md.
+services:
+  - type: web
+    name: voice-rag
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: TORCH_NUM_THREADS
+        value: 1
+      - key: RAG_LANG
+        value: hi
+      - key: SARVAM_API_KEY
+        sync: false          # set in the Render dashboard, never committed
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -1,0 +1,11 @@
+{
+  "strategy": "recursive",
+  "n_passages": 1000,
+  "n_chunks": 1478,
+  "embed_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "rerank_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+  "vector_dim": 384,
+  "lang": "hi",
+  "dataset": "ai4bharat/IndicMSMARCO:hi/train-00000-of-00001.parquet",
+  "built_at": "2026-08-22T11:19:51"
+}

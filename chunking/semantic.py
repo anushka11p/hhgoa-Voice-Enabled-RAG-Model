@@ -18,9 +18,11 @@ def get_semantic_chunks(documents: List[Dict[str, Any]], chunk_size: int = 500, 
     for doc in documents:
         text = doc.get("passage_text", "")
         
-        # Simple heuristic constraint for English sentence splitting
-        # Split on '.', '!', '?' followed by a space
-        sentences = re.split(r'(?<=[.!?]) +', text)
+        # Sentence splitting for both scripts we support.
+        # Devanagari terminates sentences with the danda (U+0964) / double
+        # danda (U+0965), not a full stop, so an English-only [.!?] rule never
+        # fires on Hindi and the whole passage collapses into one chunk.
+        sentences = re.split(r'(?<=[\u0964\u0965.!?])\s+', text)
         
         current_chunk = ""
         chunks = []

@@ -1,0 +1,50 @@
+{
+  "n_queries": 150,
+  "embed_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "chunk_size": 400,
+  "chunk_overlap": 80,
+  "results": [
+    {
+      "strategy": "semantic",
+      "n_chunks": 1467,
+      "build_s": 13.6,
+      "recall_at_1": 0.7467,
+      "recall_at_5": 0.86,
+      "mrr": 0.7961,
+      "retrieval_p50_ms": 125.69,
+      "retrieval_p100_ms": 314.1
+    },
+    {
+      "strategy": "metadata",
+      "n_chunks": 1966,
+      "build_s": 13.4,
+      "recall_at_1": 0.7333,
+      "recall_at_5": 0.86,
+      "mrr": 0.7889,
+      "retrieval_p50_ms": 78.91,
+      "retrieval_p100_ms": 114.39
+    },
+    {
+      "strategy": "recursive",
+      "n_chunks": 1478,
+      "build_s": 14.0,
+      "recall_at_1": 0.7533,
+      "recall_at_5": 0.8533,
+      "mrr": 0.7978,
+      "retrieval_p50_ms": 116.85,
+      "retrieval_p100_ms": 265.32
+    },
+    {
+      "strategy": "fixed",
+      "n_chunks": 1469,
+      "build_s": 21.8,
+      "recall_at_1": 0.6533,
+      "recall_at_5": 0.8067,
+      "mrr": 0.7094,
+      "retrieval_p50_ms": 20.16,
+      "retrieval_p100_ms": 721.23
+    }
+  ],
+  "winner": "semantic",
+  "generated_at": "2026-08-22T19:17:25"
+}

@@ -1,0 +1,19 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# generated index bundles from the chunking benchmark
+data/index/cmp_*
+
+# local scratch
+.DS_Store
+
+# local editor/dev config
+.claude/
