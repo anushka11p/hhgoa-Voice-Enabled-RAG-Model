@@ -1083,8 +1083,8 @@
 
         <div class="controls-row">
           <div class="tabs">
-            <button class="tab active" id="tab-ok" onclick="showCase('ok')">In-domain question</button>
-            <button class="tab" id="tab-refuse" onclick="showCase('refuse')">Off-topic question</button>
+            <button class="tab active" id="tab-ok" onclick="showCase('ok')">Example: in-domain</button>
+            <button class="tab" id="tab-refuse" onclick="showCase('refuse')">Example: off-topic</button>
           </div>
           <div class="record-container">
             <button id="btn-record">record question</button>
@@ -1204,7 +1204,7 @@
 
     var box = document.getElementById('answer-box');
     document.getElementById('answer-text').textContent = d.answer;
-    document.getElementById('answer-meta').textContent = d.meta;
+    document.getElementById('answer-meta').textContent = d.meta + ' · canned example, not a live run';
     box.className = 'answer ' + (d.grounded ? 'grounded' : 'refused');
 
     document.getElementById('tab-ok').className = 'tab' + (key === 'ok' ? ' active' : '');
@@ -1314,6 +1314,28 @@
       loadingOverlay.classList.remove('active');
     }
   }
+
+  // On first load the panel would otherwise show the hardcoded sample values
+  // that sit in the markup. In a judged demo those read as real results, so
+  // blank them out and invite a query instead.
+  function resetPanel(){
+    ['s0','s1','s2','s3','s4','s5'].forEach(function(id){
+      document.getElementById(id).textContent = '—';
+    });
+    var total = document.getElementById('stotal');
+    total.textContent = '—';
+    total.className = '';
+    document.getElementById('transcript').textContent = 'Ask a question to run the pipeline.';
+    document.getElementById('passages-wrap').style.display = 'none';
+    var box = document.getElementById('answer-box');
+    box.className = 'answer';
+    document.getElementById('answer-text').textContent =
+      'No query yet. Record a question, type one below, or load an example.';
+    document.getElementById('answer-meta').textContent = '';
+    document.getElementById('tab-ok').className = 'tab';
+    document.getElementById('tab-refuse').className = 'tab';
+  }
+  resetPanel();
 
   async function loadMetrics(){
     try {
