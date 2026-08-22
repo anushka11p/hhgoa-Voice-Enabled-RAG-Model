@@ -18,6 +18,13 @@ out Render's free tier and most "hobby" plans.
 
 ## Recommended: Hugging Face Spaces (free, fits comfortably)
 
+**Docker Spaces are free.** Docker is a standard SDK option alongside Gradio
+and Streamlit when creating a Space -- it does not require PRO. You also do
+not need Docker installed locally or a Docker Hub account; Hugging Face builds
+the image on their infrastructure. What costs money is *hardware upgrades*
+(GPUs, more RAM), and this app does not need them: CPU basic is 2 vCPU / 16 GB,
+which is comfortably above the ~1.5 GB this stack uses.
+
 CPU Basic gives 2 vCPU / 16 GB RAM at no cost, and caches Hugging Face model
 downloads — the best fit for this workload.
 
