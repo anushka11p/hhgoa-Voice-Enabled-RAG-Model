@@ -24,13 +24,13 @@ dataset queries. Speech-to-text is measured separately (see below).
 
 | Percentile | Latency | Target 200 ms |
 |---|---|---|
-| **P50** | **72.1 ms** | PASS |
-| **P70** | **82.2 ms** | PASS |
-| **P90** | 96.3 ms | PASS |
-| **P100** | **122.4 ms** | PASS |
+| **P50** | **95.3 ms** | PASS |
+| **P70** | **103.4 ms** | PASS |
+| **P90** | 124.3 ms | PASS |
+| **P100** | **161.4 ms** | PASS |
 
 **100/100 queries inside the budget**, measured on a *non-idle* machine
-(load ~3.5) — the adaptive reranker is designed to hold the budget under
+(load ~2.6) — the adaptive reranker is designed to hold the budget under
 contention rather than only on a quiet box.
 
 **Retrieval quality**, scored against the dataset's own query→passage labels:
@@ -45,10 +45,10 @@ contention rather than only on a quiet box.
 
 | Requirement | How |
 |---|---|
-| **Speak the question** | Browser mic → Sarvam `saarika:v2` STT (Hindi, `hi-IN`), with a pre-STT silence gate. A text endpoint mirrors it for testing without a mic. |
+| **Speak the question** | Browser mic → Sarvam `saarika:v2.5` STT (Hindi, `hi-IN`), with a pre-STT silence gate. A text endpoint mirrors it for testing without a mic. |
 | **Multiple chunking strategies** | Four implemented (fixed, semantic, recursive, metadata-aware) and **scored against the dataset's labels** — fixed-size measurably loses (Recall@1 0.653 vs 0.753). Hindi danda-aware. |
 | **Engineered retrieval** | Hybrid dense (FAISS, unit-normalized) + sparse (BM25) → Reciprocal Rank Fusion → multilingual cross-encoder rerank. |
-| **Under 200 ms** | P100 122.4 ms for the RAG core; 100/100 within budget. Scope stated explicitly below. |
+| **Under 200 ms** | P100 161.4 ms for the RAG core; 100/100 within budget. Scope stated explicitly below. |
 | **P50 / P70 / P100 benchmarked** | 100 real queries, warmed up, seeded sample — `analytics/run_benchmark.py`. Not a lucky run. |
 | **Real harness** | Pydantic contracts at every stage boundary, per-stage budgets, exponential-backoff retries (transient failures only), adaptive degradation, extractive fallback on LLM failure. |
 | **Guardrails that know when not to answer** | Five gates: silence, unsafe input, off-topic (pre + post retrieval), low confidence, grounding. Thresholds **calibrated from data**, not guessed. |
@@ -57,8 +57,9 @@ contention rather than only on a quiet box.
 
 **The 200 ms budget covers the RAG core: retrieval + generation + guardrails.**
 
-Sarvam STT is an HTTPS round trip to a third-party API and costs **~1200–1700 ms**
-measured. No local engineering changes that, so folding someone else's network
+Sarvam STT is an HTTPS round trip to a third-party API. Measured over the 11
+committed sample clips on `saarika:v2.5`: **p50 613 ms, p100 978 ms**, 0
+failures. No local engineering changes that, so folding someone else's network
 call into a "sub-200 ms pipeline" claim would make the number meaningless.
 The split is explicit in the code (`PipelineResult.core_ms` vs
 `stage_timings_ms["stt_ms"]`) and in every report.
@@ -142,9 +143,9 @@ and fallbacks. Full detail in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 | Stage | Tech | P50 |
 |---|---|---|
 | Voice input | Browser `MediaRecorder` | — |
-| Speech-to-text | Sarvam `saarika:v2` (`hi-IN`) | ~1200–1700 ms *(excluded from budget)* |
-| Query embedding | `paraphrase-multilingual-MiniLM-L12-v2` (384-d) | 14.9 ms |
-| Retrieval | FAISS + BM25 → RRF → cross-encoder | 74.7 ms |
+| Speech-to-text | Sarvam `saarika:v2.5` (`hi-IN`) | 613 ms p50 *(excluded from budget)* |
+| Query embedding | `paraphrase-multilingual-MiniLM-L12-v2` (384-d) | 20.9 ms |
+| Retrieval | FAISS + BM25 → RRF → cross-encoder | 94.0 ms |
 | Generation | Extractive (default) or Claude | 0.4 ms |
 | Guardrails | 5 gates, both sides of retrieval | 0.15 ms |
 
@@ -179,7 +180,7 @@ naive split. The top three are statistically tied at this sample size;
 | Low confidence | after retrieval | free | best passage too weak to answer from |
 | Grounding | after generation | ~0.1 ms | answers unsupported by cited passages |
 
-Refusing is **cheap**: unsafe ~12 ms, off-topic ~24–36 ms, vs ~72 ms for a full
+Refusing is **cheap**: unsafe ~19 ms, off-topic ~12–70 ms, vs ~95 ms for a full
 answer — the gates short-circuit before the expensive stages.
 
 Thresholds come from `analytics/calibrate_guardrails.py`, which scores 120 real

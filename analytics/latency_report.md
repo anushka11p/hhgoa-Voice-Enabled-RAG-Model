@@ -1,22 +1,22 @@
 # Latency report
 
-*Generated 2026-08-22T19:34:19 by `python -m analytics.make_report`.*
+*Generated 2026-08-22T21:05:14 by `python -m analytics.make_report`.*
 
 ## What is being measured
 
 The **RAG core** — retrieval + generation + guardrails. This is the part of the system we control and the part the 200 ms target applies to.
 
-Speech-to-text is **excluded from these percentiles and reported separately** below. Sarvam STT is an HTTPS round trip to a third-party API costing ~1200–1700 ms; folding someone else's network call into a "sub-200 ms" claim would make the number meaningless.
+Speech-to-text is **excluded from these percentiles and reported separately** below. Sarvam STT is an HTTPS round trip to a third-party API costing 613 ms at p50 and 978 ms at p100; folding someone else's network call into a "sub-200 ms" claim would make the number meaningless.
 
 ## Headline
 
 | Percentile | RAG core latency | Target 200 ms |
 |---|---|---|
-| **P50** | **72.1 ms** | PASS |
-| **P70** | **82.2 ms** | PASS |
-| **P100** | **122.4 ms** | PASS |
-| P90 | 96.3 ms | PASS |
-| P95 | 105.1 ms | PASS |
+| **P50** | **95.3 ms** | PASS |
+| **P70** | **103.4 ms** | PASS |
+| **P100** | **161.4 ms** | PASS |
+| P90 | 124.3 ms | PASS |
+| P95 | 127.4 ms | PASS |
 
 **100/100 queries (100.0%) completed inside the 200 ms budget.**
 
@@ -33,18 +33,18 @@ Speech-to-text is **excluded from these percentiles and reported separately** be
 
 | Stage | P50 | P70 | P90 | P100 |
 |---|---|---|---|---|
-| Query embedding | 14.89 ms | 16.71 ms | 25.98 ms | 33.86 ms |
-| Dense search (FAISS) | 0.14 ms | 0.14 ms | 0.17 ms | 0.36 ms |
-| Sparse search (BM25) | 1.94 ms | 2.33 ms | 3.30 ms | 5.91 ms |
-| RRF fusion | 0.04 ms | 0.04 ms | 0.08 ms | 0.13 ms |
-| Cross-encoder rerank | 54.98 ms | 61.65 ms | 69.99 ms | 92.83 ms |
-| **Retrieval total** | 56.68 ms | 64.36 ms | 72.51 ms | 96.40 ms |
-| Generation (extractive) | 0.27 ms | 0.30 ms | 0.39 ms | 0.51 ms |
-| Guardrails (pre-retrieval) | 0.04 ms | 0.05 ms | 0.07 ms | 0.20 ms |
-| Guardrails (post-generation) | 0.06 ms | 0.07 ms | 0.08 ms | 0.27 ms |
-| **Core total** | **72.1 ms** | **82.2 ms** | **96.3 ms** | **122.4 ms** |
+| Query embedding | 20.11 ms | 24.10 ms | 36.34 ms | 52.77 ms |
+| Dense search (FAISS) | 0.17 ms | 0.19 ms | 0.24 ms | 0.40 ms |
+| Sparse search (BM25) | 2.63 ms | 3.25 ms | 5.00 ms | 7.13 ms |
+| RRF fusion | 0.05 ms | 0.06 ms | 0.08 ms | 0.30 ms |
+| Cross-encoder rerank | 70.48 ms | 77.41 ms | 87.62 ms | 108.59 ms |
+| **Retrieval total** | 74.03 ms | 80.06 ms | 91.50 ms | 116.09 ms |
+| Generation (extractive) | 0.34 ms | 0.38 ms | 0.48 ms | 0.75 ms |
+| Guardrails (pre-retrieval) | 0.06 ms | 0.07 ms | 0.10 ms | 0.16 ms |
+| Guardrails (post-generation) | 0.08 ms | 0.09 ms | 0.13 ms | 0.37 ms |
+| **Core total** | **95.3 ms** | **103.4 ms** | **124.3 ms** | **161.4 ms** |
 
-The cross-encoder rerank is **~76% of the median budget** — the single dominant cost, and the reason the pipeline reranks adaptively rather than at a fixed width.
+The cross-encoder rerank is **~74% of the median budget** — the single dominant cost, and the reason the pipeline reranks adaptively rather than at a fixed width.
 
 ## Adaptive reranking
 
@@ -55,7 +55,7 @@ The cross-encoder rerank is **~76% of the median budget** — the single dominan
 | Rerank policy | P50 | P70 | P100 | Within budget |
 |---|---|---|---|---|
 | Fixed width (8 candidates) | 100.5 ms | 113.3 ms | 210.6 ms | 99% |
-| **Adaptive width** | **72.1 ms** | **82.2 ms** | **122.4 ms** | **100.0%** |
+| **Adaptive width** | **95.3 ms** | **103.4 ms** | **161.4 ms** | **100.0%** |
 
 ## Retrieval quality
 
@@ -95,13 +95,17 @@ Guardrails short-circuit before the expensive stages, so declining to answer cos
 |---|---|
 | Unsafe input (blocked pre-retrieval) | ~12 ms |
 | Off-topic (blocked pre-retrieval) | ~24–36 ms |
-| Full grounded answer | ~72 ms |
+| Full grounded answer | ~95 ms |
 
 ## Speech-to-text (reported separately)
 
-Not measured in this run (`SARVAM_API_KEY` not set). Re-run with `python -m analytics.run_benchmark --n 100 --with-stt`.
+Measured over 11 sample audio files (0 failures).
 
-Historical figures from `analytics/latency_log.jsonl` during development: **~1200–1700 ms per call**, dominated by network round trip to `api.sarvam.ai`.
+| Percentile | STT latency |
+|---|---|
+| P50 | 613 ms |
+| P70 | 629 ms |
+| P100 | 978 ms |
 
 This is why the 200 ms target is scoped to the RAG core. STT latency is a property of a third-party API, not of this pipeline.
 

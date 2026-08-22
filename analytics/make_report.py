@@ -49,10 +49,15 @@ def main() -> int:
         "part of the system we control and the part the 200 ms target applies "
         "to.\n"
     )
+    # Quote the measured STT figure when this run measured it, so the prose
+    # cannot drift from the table further down.
+    stt_now = (b.get("stt") or {}).get("latency_ms")
+    cost = (f"costing {stt_now['p50']:.0f} ms at p50 and {stt_now['p100']:.0f} ms at p100"
+            if stt_now else "costing several hundred ms")
     L.append(
         "Speech-to-text is **excluded from these percentiles and reported "
-        "separately** below. Sarvam STT is an HTTPS round trip to a "
-        "third-party API costing ~1200–1700 ms; folding someone else's network "
+        f"separately** below. Sarvam STT is an HTTPS round trip to a "
+        f"third-party API {cost}; folding someone else's network "
         "call into a \"sub-200 ms\" claim would make the number meaningless.\n"
     )
 

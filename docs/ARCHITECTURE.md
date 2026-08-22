@@ -42,10 +42,11 @@ about each other.
 Speech-to-text is measured and reported separately.**
 
 This is not a dodge, it is the only honest way to state it. Sarvam STT is an
-HTTPS round trip to a third-party API; measured against the committed sample
-audio it costs **~1200–1700 ms**, and no amount of local engineering changes
-that. Folding a network call to someone else's service into a "sub-200 ms
-pipeline" claim would make the number meaningless.
+HTTPS round trip to a third-party API; measured over the 11 committed sample
+clips on `saarika:v2.5` it costs **613 ms at p50 and 978 ms at p100**, and no
+amount of local engineering changes that. Folding a network call to someone
+else's service into a "sub-200 ms pipeline" claim would make the number
+meaningless.
 
 So the split is explicit everywhere in the code:
 
@@ -62,11 +63,11 @@ Measured over 100 real dataset queries (see `analytics/latency_report.md`):
 
 | Stage | Typical share |
 |---|---|
-| Query embedding | ~25 ms |
+| Query embedding | ~21 ms |
 | Dense search (FAISS) | ~0.2 ms |
 | BM25 search | ~3 ms |
 | RRF fusion | ~0.1 ms |
-| Cross-encoder rerank | ~70 ms — **the dominant cost** |
+| Cross-encoder rerank | ~72 ms — **the dominant cost** |
 | Generation (extractive) | ~0.4 ms |
 | Guardrails (both sides) | ~0.15 ms |
 

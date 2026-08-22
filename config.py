@@ -174,7 +174,8 @@ MIN_QUERY_CHARS = _env_int("MIN_QUERY_CHARS", 3)
 # --------------------------------------------------------------------------
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
 STT_ENDPOINT = _env("STT_ENDPOINT", "https://api.sarvam.ai/speech-to-text")
-STT_MODEL = _env("STT_MODEL", "saarika:v2")
+# saarika:v2 was deprecated by Sarvam (HTTP 400: "Please use 'saarika:v2.5'").
+STT_MODEL = _env("STT_MODEL", "saarika:v2.5")
 STT_TIMEOUT_S = _env_float("STT_TIMEOUT_S", 15.0)
 STT_MAX_RETRIES = _env_int("STT_MAX_RETRIES", 2)
 SILENCE_RMS_THRESHOLD = _env_int("SILENCE_RMS_THRESHOLD", 300)

@@ -39,6 +39,18 @@ _CATEGORIES = {
     "csam": [
         r"\bchild (porn|sexual)", r"\bminor.{0,15}\bsexual\b", r"\bcsam\b",
     ],
+    "medical_misinformation": [
+        # Requests for deliberately false or fabricated health guidance. The
+        # corpus contains real drug and disease passages, so without this gate
+        # the pipeline will happily serve one in response.
+        r"\bfake (medical|health|drug|medicine)",
+        r"\bfalse (medical|health|drug|medicine)",
+        r"\b(made[- ]up|fabricated|wrong) (medical|health|diagnosis|prescription)",
+        r"\bgive me (false|fake|wrong) .{0,20}(advice|information)",
+        r"झूठी?\s*(दवा|चिकित्सा|मेडिकल|स्वास्थ्य|सलाह)",
+        r"(गलत|नकली|फ़र्ज़ी|फर्जी)\s*(दवा|इलाज|सलाह|चिकित्सा)",
+        r"(दवा|इलाज|चिकित्सा).{0,12}(झूठी|गलत|नकली)\s*सलाह",
+    ],
     "cyber_attack": [
         r"\bhack (into|someone|his|her|their)\b", r"\bsteal (password|credit card)",
         r"\bransomware\b", r"\bddos attack\b", r"\bkeylogger\b",
