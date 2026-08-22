@@ -23,7 +23,7 @@ import config
 from harness.logging_utils import log_run, read_percentiles
 from harness.orchestrator import PipelineError, run_from_audio, run_from_text
 from harness.schemas import QueryRequest
-from stt.audio_check import is_likely_silence
+from stt.audio_check import is_likely_silence, probe
 
 STATE = {"ready": False, "error": None}
 
@@ -110,10 +110,17 @@ async def query(audio: UploadFile = File(...)):
         # Cheapest possible guardrail: reject near-silent audio before paying
         # for an STT round trip. Empty audio otherwise tends to come back as a
         # confidently hallucinated transcript.
-        if is_likely_silence(tmp_path):
+        # Log whether the gate actually ran. It can only inspect 16-bit PCM
+        # WAV, and a format it cannot read fails open -- worth seeing in the
+        # logs rather than silently passing everything through.
+        info = probe(tmp_path)
+        if not info["checked"]:
+            print(f"[silence-gate] skipped: {info['reason']} ({audio.filename})")
+        elif is_likely_silence(tmp_path):
             return {
                 "error": "No speech detected in the audio. Please try again.",
                 "guardrail_stage": "silence",
+                "rms": round(info["rms"], 1),
             }
 
         result = run_from_audio(tmp_path)

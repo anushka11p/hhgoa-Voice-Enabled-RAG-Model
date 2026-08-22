@@ -1363,7 +1363,57 @@
     if (e.key === 'Enter') askText();
   });
 
-  let mediaRecorder, audioChunks = [];
+  // ---- audio capture format ---------------------------------------------
+  // MediaRecorder cannot produce WAV in any current browser
+  // (isTypeSupported('audio/wav') === false) -- it records WebM/Opus or MP4.
+  // The old code wrapped those bytes in a Blob labelled 'audio/wav', which
+  // mislabelled rather than converted: Sarvam received a corrupt WAV, and the
+  // pre-STT silence gate could not parse it and silently passed everything
+  // through. So we record in whatever the browser actually supports, then
+  // decode and re-encode to real 16-bit PCM WAV before upload.
+  function pickMimeType(){
+    const prefs = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+    for (const t of prefs) if (MediaRecorder.isTypeSupported(t)) return t;
+    return '';   // let the browser choose
+  }
+
+  const TARGET_RATE = 16000;   // Sarvam handles 16 kHz mono well and it keeps uploads small
+
+  function encodeWav(samples, sampleRate){
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buf);
+    const wr = (off, str) => { for (let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); };
+    wr(0,'RIFF'); view.setUint32(4, 36 + samples.length*2, true); wr(8,'WAVE');
+    wr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);   // PCM
+    view.setUint16(22,1,true);                                             // mono
+    view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate*2,true);
+    view.setUint16(32,2,true); view.setUint16(34,16,true);                 // 16-bit
+    wr(36,'data'); view.setUint32(40, samples.length*2, true);
+    let off = 44;
+    for (let i=0;i<samples.length;i++,off+=2){
+      const c = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, c < 0 ? c*0x8000 : c*0x7FFF, true);
+    }
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  async function toWavBlob(blob){
+    const bytes = await blob.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await ctx.decodeAudioData(bytes);
+    // Downmix to mono and resample to TARGET_RATE in one offline pass.
+    const frames = Math.ceil(decoded.duration * TARGET_RATE);
+    const off = new OfflineAudioContext(1, frames, TARGET_RATE);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    ctx.close();
+    return encodeWav(rendered.getChannelData(0), TARGET_RATE);
+  }
+
+  let mediaRecorder, audioChunks = [], micStream = null;
 
   document.getElementById('btn-record').addEventListener('click', async function() {
     const btn = this;
@@ -1378,9 +1428,10 @@
     if (btn.textContent === 'record question') {
       audioChunks = [];
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = pickMimeType();
+        mediaRecorder = new MediaRecorder(micStream, mimeType ? { mimeType } : undefined);
+        mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) audioChunks.push(e.data); };
         mediaRecorder.start();
         
         btn.textContent = 'stop and send';
@@ -1389,14 +1440,11 @@
         micBtn.classList.add('active');
         waveform.classList.add('active');
       } catch (err) {
+        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
         showError('Microphone access denied: ' + err.message);
         statusBadge.textContent = 'error';
       }
     } else {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-      
       btn.textContent = 'processing...';
       btn.classList.remove('recording');
       statusBadge.textContent = 'processing';
@@ -1406,18 +1454,28 @@
       loadingOverlay.classList.add('active');
       pipelineRail.classList.add('loading');
 
+      // Assign the handler before calling stop() -- stop() fires the event, so
+      // wiring it afterwards was a race.
       mediaRecorder.onstop = async function() {
         try {
-          const blob = new Blob(audioChunks, { type: 'audio/wav' });
-          console.log('Recorded blob size:', blob.size, 'bytes');
+          // Release the microphone as soon as we have the audio, so the
+          // browser's recording indicator does not stay on.
+          if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+
+          const recorded = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (!recorded.size) throw new Error('No audio was captured. Check microphone permissions.');
+
+          // Re-encode to real PCM WAV -- see toWavBlob() for why.
+          const blob = await toWavBlob(recorded);
           const formData = new FormData();
           formData.append('audio', blob, 'query.wav');
 
           const resp = await fetch('/api/query', { method: 'POST', body: formData });
-          if (!resp.ok) {
-            throw new Error(`Server returned HTTP ${resp.status}`);
-          }
-          const data = await resp.json();
+          // Read the body even on a non-2xx: the server sends a useful message
+          // (missing API key, STT failure) that a bare status code throws away.
+          let data;
+          try { data = await resp.json(); }
+          catch (e) { throw new Error(`Server returned HTTP ${resp.status}`); }
 
           btn.textContent = 'record question';
           statusBadge.textContent = 'ready';
@@ -1441,6 +1499,10 @@
           showError('Pipeline error: ' + err.message);
         }
       };
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
     }
   });
   // --- 3D Scroll-Driven Intro Engine ---
